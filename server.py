@@ -9,6 +9,7 @@ import numpy as np
 import sys
 sys.path.append('/home/pi/Desktop/scripts/app/sort')  # Додаємо шлях до репозиторію SORT
 from sort import Sort  # Імпортуємо SORT з локального репозиторію
+from ultralytics import YOLO  # Імпортуємо YOLOv8
 
 app = Flask(__name__)
 
@@ -32,8 +33,8 @@ STEP = 5
 MIN_ANGLE = 0
 MAX_ANGLE = 180
 
-# Завантаження моделі YOLOv5
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
+# Завантаження моделі YOLOv8
+model = YOLO('yolov8n.pt')  # Використовуємо найшвидшу модель 'yolov8n.pt'
 
 # Змінна для зберігання об'єктів
 detected_objects = {}
@@ -44,25 +45,32 @@ tracker = Sort()
 # Змінна для стеження
 tracking_object_id = None
 
-
 def generate():
     global detected_objects, tracking_object_id
     while True:
         frame = picam2.capture_array()
         frame = cv2.rotate(frame, cv2.ROTATE_180)
 
-        # Детекція
-        results = model(frame)
+        # Перетворення зображення з 4 каналів (якщо це необхідно) у 3 канали (RGB)
+        if frame.shape[2] == 4:  # Якщо зображення має 4 канали (включаючи альфа-канал)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)  # Перетворюємо в RGB (BGR в нашому випадку)
+
+        # Детекція через YOLOv8
+        results = model.predict(frame, verbose=False, stream=False)[0]
+
         boxes = []
-        for *box, conf, cls in results.xyxy[0]:
-            if int(cls) == 0:  # person
-                boxes.append([int(box[0]), int(box[1]), int(box[2]), int(box[3]), conf.item()])
+        for box in results.boxes:
+            cls_id = int(box.cls[0])
+            conf = float(box.conf[0])
+            if cls_id == 0:  # тільки люди (ID 0 для 'person')
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                boxes.append([x1, y1, x2, y2, conf])
 
         # Якщо є детекції, оновлюємо трекер
         if boxes:
             tracked_objects = tracker.update(np.array(boxes))
-
             current_objects = {}
+
             for obj in tracked_objects:
                 x1, y1, x2, y2, track_id = obj
                 track_id = int(track_id)
@@ -80,31 +88,28 @@ def generate():
                 detected_objects[track_id]['last_seen'] = time.time()
                 current_objects[track_id] = detected_objects[track_id]
 
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
+                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
                 cv2.putText(frame, f"ID: {track_id}", (int(x1), int(y1) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
             detected_objects = current_objects
 
-            # 🎯 Автоматичне стеження
+            # Автоматичне стеження
             if tracking_object_id is not None:
                 if tracking_object_id in detected_objects:
                     track_object_with_servos(tracking_object_id, frame)
                 else:
                     print(f"[WARN] Об'єкт з ID {tracking_object_id} більше не знайдено. Скасовуємо стеження.")
                     tracking_object_id = None
-
         else:
-            # Якщо взагалі немає детекцій — теж скидаємо
             if tracking_object_id is not None:
-                print(f"[INFO] Об'єктів немає в кадрі. Стеження зупинено.")
+                print("[INFO] Об'єктів немає в кадрі. Стеження зупинено.")
                 tracking_object_id = None
 
         # Генерація кадру MJPEG
         _, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
         yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
         time.sleep(0.01)
-
 
 @app.route('/video')
 def video():
@@ -134,7 +139,6 @@ def move_servo():
         servo_tilt += STEP
     elif direction == 'down' and servo_tilt > MIN_ANGLE:
         servo_tilt -= STEP
-
     kit.servo[0].angle = servo_pan
     kit.servo[1].angle = servo_tilt
 
@@ -164,7 +168,7 @@ def stop_tracking():
 
 
 def track_object_with_servos(object_id, frame):
-    """Пропорційне наведення серво на центр об'єкта з урахуванням перевернутої камери"""
+    """Пропорційне наведення серво на центр об'єкта з діагональним рухом"""
     global servo_pan, servo_tilt, kit
 
     if object_id in detected_objects:
@@ -174,25 +178,40 @@ def track_object_with_servos(object_id, frame):
         center_y = (y1 + y2) // 2
 
         frame_height, frame_width, _ = frame.shape
-        delta_x = center_x - frame_width // 2
-        delta_y = center_y - frame_height // 2
+        delta_x = center_x - frame_width // 2  # Відстань між центром кадру та центром об'єкта по X
+        delta_y = center_y - frame_height // 2  # Відстань між центром кадру та центром об'єкта по Y
 
-        # ⚠ Змінено: обернене управління, бо зображення перевернуто
-        sensitivity = 0.05
-        correction_x = delta_x * sensitivity      # без мінуса
-        correction_y = -delta_y * sensitivity     # тут інвертуємо
+        # Виправлене керування X та Y:
+        sensitivity = 0.05  # Зменшити чи збільшити залежно від потреб
 
+        # Коригування зміщення по осям
+        correction_x = delta_x * sensitivity  # зміщення по осі X
+        correction_y = delta_y * sensitivity  # зміщення по осі Y
+
+        # Лімітуємо швидкість зміни кута (максимальний крок)
+        max_step = 2  # максимальний крок для зміни кута (за один раз)
+        
+        # Обмежуємо рух по X (панорамування)
+        if abs(correction_x) > max_step:
+            correction_x = max_step * (1 if correction_x > 0 else -1)
+
+        # Обмежуємо рух по Y (нахил)
+        if abs(correction_y) > max_step:
+            correction_y = max_step * (1 if correction_y > 0 else -1)
+
+        # Оновлюємо кути сервоприводів, враховуючи обмеження швидкості
         servo_pan += int(correction_x)
         servo_tilt += int(correction_y)
 
+        # Обмежуємо кути сервоприводів в межах допустимих значень
         servo_pan = max(MIN_ANGLE, min(servo_pan, MAX_ANGLE))
         servo_tilt = max(MIN_ANGLE, min(servo_tilt, MAX_ANGLE))
 
+        # Встановлюємо нові кути на сервоприводи
         kit.servo[0].angle = servo_pan
         kit.servo[1].angle = servo_tilt
 
         print(f"🎯 Пан: {servo_pan}, Нахил: {servo_tilt} | ΔX: {delta_x}, ΔY: {delta_y}")
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, threaded=True)
