@@ -15,6 +15,7 @@ app = Flask(__name__)
 
 # Ініціалізація камери
 picam2 = Picamera2()
+# Налаштування камери перед запуском
 
 # Ініціалізація панелі керування для сервоприводів
 kit = ServoKit(channels=16)
@@ -51,6 +52,9 @@ prev_error_y = 0
 integral_x = 0
 integral_y = 0
 last_move_time = 0
+
+
+
 
 # Add this function definition at the top of your script
 def draw_crosshair(frame):
