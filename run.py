@@ -53,7 +53,7 @@ if not os.path.exists(model_path):
 
 
 # Завантаження моделі YOLOv8
-model = YOLO('yolov8n.pt')  # Використовуємо найшвидшу модель 'yolov8n.pt'
+model = YOLO('models/yolov8n.pt')  # Використовуємо найшвидшу модель 'yolov8n.pt'
 
 # Змінна для зберігання об'єктів
 detected_objects = {}
