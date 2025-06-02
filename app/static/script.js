@@ -46,6 +46,9 @@ function updateObjects() {
         .catch(error => console.error('Error:', error)); // Обробка помилок
 }
 
+
+
+
 // Логіка для стеження за об'єктами
 function trackObject(index) {
     console.log('Стежимо за об\'єктом з індексом: ', index);
@@ -75,6 +78,7 @@ function stopTrackingObject(index) {
     .then(data => console.log(data)) // Виводимо відповідь від сервера
     .catch(error => console.error('Error:', error)); // Обробка помилок
 }
+
 
 // Оновлюємо список об'єктів кожні 3 секунди
 setInterval(updateObjects, 3000);

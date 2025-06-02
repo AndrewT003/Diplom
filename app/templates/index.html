@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Керування сервоприводами</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Система Автоматичного стеження</title>
+    <link rel="stylesheet" href="../static/style.css">
+    <!--<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> -->
 </head>
 <body>
-    <h1>Керування сервоприводами</h1>
-
+    <h1>СИСТЕМА АВТОМАТИЧНОГО СТЕЖЕННЯ</h1>
     <div id="video-container">
         <h2>Відео з камери</h2>
         <img src="{{ url_for('video') }}" width="640" height="480">
@@ -23,13 +23,15 @@
         </div>
         <button onclick="move('down')">низ</button>
     </div>
-
-    <h2>Розпізнані об'єкти:</h2>
-    <ul id="object-list">
-        <!-- Список об'єктів буде оновлюватися тут -->
-    </ul>
-
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <div id="object-box">
+        <h2>Розпізнані об'єкти</h2>
+        <ul id="object-list">
+            <!-- Список об'єктів буде оновлюватися тут -->
+        </ul>
+    </div>
+    <script src="../static/script.js"></script>
+    <!-- <script src="{{ url_for('static', filename='script.js') }}"></script> -->
 </body>
 </html>
 
