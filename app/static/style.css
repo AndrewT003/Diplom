@@ -1,0 +1,88 @@
+body {
+    align-items: center;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin-top: 50px;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    background-color: #f0f0f0;
+    flex-direction: column;
+}
+
+h1 {
+    width: 100%;
+}
+
+h2 {
+    margin-top: 30px;
+}
+
+#video-container {
+    position: relative;
+    width: 640px;
+    height: 480px;
+    display: inline-block;
+    margin-bottom: 20px; /* Між відео та кнопками */
+}
+
+.controls {
+    margin-top: 100px;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+button {
+    font-size: 20px;
+    padding: 15px;
+    margin: 10px;
+    cursor: pointer;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 5px;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+#object-list {
+    list-style-type: none;
+    padding: 0;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+    width: 250px;
+    max-height: 480px;
+    overflow-y: auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    padding: 10px;
+}
+
+#object-list li {
+    background: #f4f4f4;
+    margin: 5px;
+    padding: 5px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#object-list li button {
+    padding: 5px 10px;
+    font-size: 12px;
+    background-color: #FF6347;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+}
+
+#object-list li button:hover {
+    background-color: #FF4500;
+}
+

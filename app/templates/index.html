@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Керування сервоприводами</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Керування сервоприводами</h1>
+
+    <div id="video-container">
+        <h2>Відео з камери</h2>
+        <img src="{{ url_for('video') }}" width="640" height="480">
+    </div>
+
+    <!-- Контейнер для кнопок -->
+    <div class="controls">
+        <button onclick="move('up')">вверх</button>
+        <div>
+            <button onclick="move('left')">ліво</button>
+            <button onclick="move('right')">право</button>
+        </div>
+        <button onclick="move('down')">низ</button>
+    </div>
+
+    <h2>Розпізнані об'єкти:</h2>
+    <ul id="object-list">
+        <!-- Список об'єктів буде оновлюватися тут -->
+    </ul>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
