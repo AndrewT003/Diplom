@@ -7,8 +7,8 @@ import torch
 import uuid
 import numpy as np
 import sys
-sys.path.append('/home/pi/Desktop/scripts/app/sort')  
-from sort import Sort  
+sys.path.append(os.path.join(os.path.dirname(__file__), 'app/sort'))
+from sort import Sort
 from ultralytics import YOLO  
 
 import os

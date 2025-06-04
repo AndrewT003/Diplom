@@ -27,6 +27,27 @@ def is_libcamera_available():
     result = subprocess.run(["which", "libcamera-hello"], capture_output=True)
     return result.returncode == 0
 
+
+def clone_sort_if_needed():
+    sort_dir = project_dir / "app" / "sort"
+    if not sort_dir.exists():
+        print(f"{START_INFO} Клоную SORT у {sort_dir}...")
+        subprocess.run(["git", "clone", "https://github.com/abewley/sort.git", str(sort_dir)], check=True)
+    else:
+        print(f"{START_INFO} SORT вже існує в {sort_dir}")
+
+# === ГОЛОВНА ЛОГІКА ===
+if not venv_dir.exists():
+    create_virtualenv()
+
+if not python_exec.exists():
+    print(f"{START_ERROR} Віртуальне середовище створено некоректно.")
+    sys.exit(1)
+
+install_requirements()
+clone_sort_if_needed()
+
+
 def is_picamera2_available():
     result = subprocess.run([str(python_exec), "-c", "from picamera2 import Picamera2"], capture_output=True)
     return result.returncode == 0
