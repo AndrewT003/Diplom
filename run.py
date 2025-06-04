@@ -7,9 +7,9 @@ import torch
 import uuid
 import numpy as np
 import sys
-sys.path.append('/home/pi/Desktop/scripts/app/sort')  # Додаємо шлях до репозиторію SORT
-from sort import Sort  # Імпортуємо SORT з локального репозиторію
-from ultralytics import YOLO  # Імпортуємо YOLOv8
+sys.path.append('/home/pi/Desktop/scripts/app/sort')  
+from sort import Sort  
+from ultralytics import YOLO  
 
 import os
 app = Flask(
@@ -19,19 +19,15 @@ app = Flask(
 )
 
 
-# Ініціалізація камери
 picam2 = Picamera2()
-# Налаштування камери перед запуском
 
-# Ініціалізація панелі керування для сервоприводів
 kit = ServoKit(channels=16)
 
-# Запуск камери
 picam2.start()
 
 # Поточні кути сервоприводів
-servo_pan = 90  # Змінено на 90 для точного центрування
-servo_tilt = 90  # Змінено на 90 для точного центрування
+servo_pan = 90  
+servo_tilt = 90  
 
 # Крок повороту
 STEP = 5
@@ -42,7 +38,7 @@ MAX_ANGLE = 180
 
 model_path = os.path.join('models', 'yolov8n.pt')
 
-# Перевірка, чи файл існує. Якщо ні — завантажити.
+# Перевірка, чи файл існує.
 if not os.path.exists(model_path):
     print('[INFO] Завантаження YOLOv8n.pt у папку models...')
     os.makedirs('models', exist_ok=True)
@@ -52,19 +48,14 @@ if not os.path.exists(model_path):
     print('[INFO] Завантаження завершено.')
 
 
-# Завантаження моделі YOLOv8
-model = YOLO('models/yolov8n.pt')  # Використовуємо найшвидшу модель 'yolov8n.pt'
+model = YOLO('models/yolov8n.pt')  
 
-# Змінна для зберігання об'єктів
 detected_objects = {}
 
-# Ініціалізація трекера SORT
 tracker = Sort()
 
-# Змінна для стеження
 tracking_object_id = None
 
-# Змінні для PID контролера
 prev_error_x = 0
 prev_error_y = 0
 integral_x = 0
@@ -74,23 +65,19 @@ last_move_time = 0
 
 
 
-# Add this function definition at the top of your script
 def draw_crosshair(frame):
     height, width, _ = frame.shape
     center_x = width // 2
     center_y = height // 2
-    color = (0, 255, 0)  # Green color
+    color = (0, 255, 0)  
     thickness = 1
-    length = 10  # Length of the crosshair lines
+    length = 10  
     
-    # Draw the horizontal line
     cv2.line(frame, (center_x - length, center_y), (center_x + length, center_y), color, thickness)
-    # Draw the vertical line
     cv2.line(frame, (center_x, center_y - length), (center_x, center_y + length), color, thickness)
     
     return frame
 
-# Update your 'generate' function to use 'draw_crosshair' after processing the frame.
 def generate():
     global detected_objects, tracking_object_id
     
@@ -108,7 +95,7 @@ def generate():
         for box in results.boxes:
             cls_id = int(box.cls[0])
             conf = float(box.conf[0])
-            if cls_id == 0:  # Class 0 is for people
+            if cls_id == 0:  
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 boxes.append([x1, y1, x2, y2, conf])
         
@@ -137,7 +124,6 @@ def generate():
                 print("[INFO] Об'єктів немає в кадрі. Стеження зупинено.")
                 tracking_object_id = None
         
-        # Call the draw_crosshair function to draw the crosshair on the frame
         frame = draw_crosshair(frame)
         
         _, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
@@ -179,7 +165,7 @@ def move_servo():
 @app.route('/track', methods=['POST'])
 def track_object():
     global tracking_object_id
-    object_index = int(request.form.get('object_id'))  # index зі списку
+    object_index = int(request.form.get('object_id'))  
     keys = list(detected_objects.keys())
     
     if 0 <= object_index < len(keys):
@@ -201,91 +187,54 @@ def stop_tracking():
 def track_object_with_servos(box, frame):
     global servo_pan, servo_tilt, prev_error_x, integral_x, prev_error_y, integral_y
     
-    # Отримуємо координати прямокутника об'єкта
     x1, y1, x2, y2 = map(int, box)
-    
-    # Розміри кадру
     frame_height, frame_width = frame.shape[:2]
-    
-    # Центр кадру
     center_screen_x = frame_width // 2
     center_screen_y = frame_height // 2
-    
-    # Центр об'єкта
     center_obj_x = x1 + (x2 - x1) // 2
     center_obj_y = y1 + (y2 - y1) // 2
-    
+
     # Візуалізація
     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
     cv2.circle(frame, (center_screen_x, center_screen_y), 5, (0, 0, 255), -1)
     cv2.circle(frame, (center_obj_x, center_obj_y), 5, (255, 0, 0), -1)
-    
-    # Виведення координат X та Y
     cv2.putText(frame, f"X: {center_obj_x}, Y: {center_obj_y}", 
                 (20, frame_height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, 
                 (0, 255, 0), 2, cv2.LINE_AA)
-
-    # Малюємо координатну площину (ось X і Y)
     cv2.line(frame, (center_obj_x, 0), (center_obj_x, frame_height), (0, 255, 0), 2)
     cv2.line(frame, (0, center_obj_y), (frame_width, center_obj_y), (0, 255, 0), 2)
-    
-    # Обчислення похибки по осі X
-    error_x = center_screen_x - center_obj_x  # Перевертаємо похибку для правильного напрямку
-    
-    # Параметри PID-регулятора для стабілізації по X
-    kp_x = 0.01  # Збільшили пропорційний коефіцієнт для X (для більш швидкої реакції)
-    ki_x = 0.0001  # Інтегральний коефіцієнт для X
-    kd_x = 0.01  # Диференційний коефіцієнт для X
-    
-    # Оновлення інтегральної складової для X
+
+    # PID параметри
+    kp_x, ki_x, kd_x = 0.04, 0.0002, 0.02
+    kp_y, ki_y, kd_y = 0.04, 0.0002, 0.02
+    max_step_x = 3.0
+    max_step_y = 3.0
+    max_integral = 80
+    dead_zone_x = 8
+    dead_zone_y = 12
+
+    # Похибка по X
+    error_x = center_screen_x - center_obj_x
     integral_x += error_x
-    max_integral_x = 50
-    integral_x = max(-max_integral_x, min(integral_x, max_integral_x))
-    
-    # Обчислення диференційної складової для X
+    integral_x = max(-max_integral, min(integral_x, max_integral))
     derivative_x = error_x - prev_error_x
-    
-    # Обчислення коригуючого сигналу для сервоприводу по X
     pan_adjustment = kp_x * error_x + ki_x * integral_x + kd_x * derivative_x
-    
-    # Обмеження максимального кроку руху по X
-    max_step_x = 0.5  # Збільшили максимальний крок для більш швидкого руху
     pan_adjustment = max(-max_step_x, min(pan_adjustment, max_step_x))
-    
-    # Збереження поточної похибки для наступної ітерації
     prev_error_x = error_x
-    
-    # Визначення мертвої зони для руху по осі X
-    dead_zone_x = 10  # Зменшили мертву зону для більш чутливого реагування
+
     if abs(error_x) > dead_zone_x:
-        # Оновлення положення сервоприводу по осі X
         servo_pan = max(MIN_ANGLE, min(MAX_ANGLE, servo_pan + pan_adjustment))
         kit.servo[1].angle = servo_pan
-    
-    # Обчислення похибки по осі Y
-    error_y = center_obj_y - center_screen_y  # Змінили знак на правильний напрямок
-    
-    # Параметри PID-регулятора для стабілізації по Y
-    kp_y = 0.01  # Збільшили пропорційний коефіцієнт для Y (для більш швидкої реакції)
-    ki_y = 0.0001  # Інтегральний коефіцієнт для Y
-    kd_y = 0.01  # Диференційний коефіцієнт для Y
-    
-    # Оновлення інтегральної складової для Y
+
+    # Похибка по Y
+    error_y = center_obj_y - center_screen_y
     integral_y += error_y
-    max_integral_y = 50
-    integral_y = max(-max_integral_y, min(integral_y, max_integral_y))
-    
-    # Обчислення диференційної складової для Y
+    integral_y = max(-max_integral, min(integral_y, max_integral))
     derivative_y = error_y - prev_error_y
-    
-    # Обчислення коригуючого сигналу для сервоприводу по Y
     tilt_adjustment = kp_y * error_y + ki_y * integral_y + kd_y * derivative_y
-    
-    # Оновлення попередньої похибки для Y
+    tilt_adjustment = max(-max_step_y, min(tilt_adjustment, max_step_y))
     prev_error_y = error_y
-    
-    # Визначення мертвої зони для руху по осі Y
-    dead_zone_y = 20  # Зменшили мертву зону для більш чутливого реагування
+
     if abs(error_y) > dead_zone_y:
         servo_tilt = max(MIN_ANGLE, min(MAX_ANGLE, servo_tilt + tilt_adjustment))
         kit.servo[0].angle = servo_tilt
@@ -295,9 +244,9 @@ def track_object_with_servos(box, frame):
 
 
 
+
 if __name__ == '__main__':
     try:
-        # Встановлюємо початкові положення сервоприводів
         kit.servo[0].angle = servo_tilt
         kit.servo[1].angle = servo_pan
         print(f"[INFO] Початкові положення: PAN={servo_pan}, TILT={servo_tilt}")
